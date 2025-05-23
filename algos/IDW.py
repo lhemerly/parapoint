@@ -179,7 +179,7 @@ def run_idw_example(
     resolution=1.0,
     idw_search_radius=5.0,
     idw_power=2.0,
-    user_defined_extent=None,
+    dtm_extent_user=None,
     nodata_value=-9999.0,
     verbose=True # Control print statements for testing
 ):
