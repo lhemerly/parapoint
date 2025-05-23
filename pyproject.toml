@@ -1,0 +1,16 @@
+[project]
+name = "parapoint"
+version = "0.1.0"
+description = "A Python library for fast point cloud interpolation using Taichi, including IDW and simple averaging methods."
+readme = "README.md"
+requires-python = ">=3.10" # Assuming Taichi and your code are compatible. Check Taichi's specific Python version requirements if issues arise.
+dependencies = [
+    "numpy>=1.20", # Specify a reasonable minimum version
+    "taichi>=1.7.0"  # Specify a reasonable minimum version for Taichi
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=3.0"
+]
