@@ -125,8 +125,12 @@ def create_dtm_with_taichi_idw(
     print(f"DTM Extent: X({min_x:.2f} - {max_x:.2f}), Y({min_y:.2f} - {max_y:.2f})")
 
     # Calculate DTM grid dimensions
-    grid_width = int(np.ceil((max_x - min_x) / dtm_resolution))
-    grid_height = int(np.ceil((max_y - min_y) / dtm_resolution))
+    if ground_points_xyz.shape[0] == 0: # Should have been caught by earlier check, but defensive
+        grid_width = 0
+        grid_height = 0
+    else:
+        grid_width = max(1, int(np.ceil((max_x - min_x) / dtm_resolution)))
+        grid_height = max(1, int(np.ceil((max_y - min_y) / dtm_resolution)))
     
     # Adjust max_x, max_y to be the actual extent of the grid for consistency
     # This is important for calculating cell centers accurately.
@@ -169,51 +173,69 @@ def create_dtm_with_taichi_idw(
     return dtm_np
 
 # --- Example Usage ---
-if __name__ == "__main__":
-    print("--- Running Taichi DTM IDW Interpolation Example ---")
+def run_idw_example(
+    num_sample_points=500, # Reduced default for faster example/testing
+    extent_size=20.0,    # Reduced default
+    resolution=1.0,
+    idw_search_radius=5.0,
+    idw_power=2.0,
+    dtm_extent_user=None,
+    nodata_value=-9999.0,
+    verbose=True # Control print statements for testing
+):
+    """Runs a full example of IDW DTM generation."""
+    if verbose:
+        print("--- Running Taichi DTM IDW Interpolation Example ---")
     
-    # 1. Create some sample ground points (replace with your actual data loading)
-    num_sample_points = 500000  # Increased for a slightly more demanding test
-    extent_size = 200.0
+    # 1. Create some sample ground points
     sample_points = np.random.rand(num_sample_points, 3).astype(np.float32) * extent_size
-    sample_points[:, 2] = (np.sin(sample_points[:, 0] / (extent_size/10)) * 10 +
-                           np.cos(sample_points[:, 1] / (extent_size/10)) * 10 +
-                           sample_points[:,0] * 0.05 + # Gentle slope
-                           np.random.rand(num_sample_points) * 2) # Some noise
+    if num_sample_points > 0: # Avoid division by zero if num_sample_points is 0
+        sample_points[:, 2] = (np.sin(sample_points[:, 0] / (extent_size/10 if extent_size > 0 else 1.0)) * 10 +
+                               np.cos(sample_points[:, 1] / (extent_size/10 if extent_size > 0 else 1.0)) * 10 +
+                               sample_points[:,0] * 0.05 + # Gentle slope
+                               np.random.rand(num_sample_points) * 2) # Some noise
     
-    print(f"Generated {sample_points.shape[0]} sample points.")
+    if verbose:
+        print(f"Generated {sample_points.shape[0]} sample points.")
 
-    # 2. Define DTM parameters
-    resolution = 1.0
-    idw_search_radius = 5.0  # Search radius for IDW (in the same units as coordinates)
-    idw_power = 2.0
-    
-    # Optional: define a specific extent. If None, it will be auto-calculated.
-    # user_defined_extent = (0.0, 0.0, extent_size, extent_size) 
-    user_defined_extent = None
-
-    # 3. Create the DTM
+    # 2. Create the DTM
     dtm_array = create_dtm_with_taichi_idw(
         sample_points,
         resolution,
         idw_search_radius,
         power=idw_power,
         dtm_extent_user=user_defined_extent,
-        nodata_value=-9999.0
+        nodata_value=nodata_value
     )
 
-    # 4. Output information about the DTM
-    if dtm_array.size > 0:
-        print(f"\nGenerated IDW DTM shape: {dtm_array.shape}") # (height, width)
-        valid_dtm_values = dtm_array[dtm_array != -9999.0]
-        if valid_dtm_values.size > 0:
-            print(f"DTM min value (excluding NoData): {np.min(valid_dtm_values):.2f}")
-            print(f"DTM max value (excluding NoData): {np.max(valid_dtm_values):.2f}")
+    # 3. Output information about the DTM (if verbose)
+    if verbose:
+        if dtm_array.size > 0:
+            print(f"\nGenerated IDW DTM shape: {dtm_array.shape}") # (height, width)
+            valid_dtm_values = dtm_array[dtm_array != nodata_value]
+            if valid_dtm_values.size > 0:
+                print(f"DTM min value (excluding NoData): {np.min(valid_dtm_values):.2f}")
+                print(f"DTM max value (excluding NoData): {np.max(valid_dtm_values):.2f}")
+            else:
+                print("DTM contains only NoData values.")
+            num_nodata_cells = np.sum(dtm_array == nodata_value)
+            print(f"Number of NoData cells: {num_nodata_cells} out of {dtm_array.size} total cells ({num_nodata_cells/dtm_array.size*100:.1f}%)")
         else:
-            print("DTM contains only NoData values.")
-        num_nodata_cells = np.sum(dtm_array == -9999.0)
-        print(f"Number of NoData cells: {num_nodata_cells} out of {dtm_array.size} total cells ({num_nodata_cells/dtm_array.size*100:.1f}%)")
+            print("IDW DTM generation resulted in an empty array.")
+    
+    return dtm_array
 
-    else:
-        print("IDW DTM generation resulted in an empty array.")
+if __name__ == "__main__":
+    # Run with default parameters for the main execution.
+    # These can be larger/more demanding than the test version.
+    run_idw_example(
+        num_sample_points=500000,
+        extent_size=200.0,
+        resolution=1.0,
+        idw_search_radius=5.0,
+        idw_power=2.0,
+        user_defined_extent=None,
+        nodata_value=-9999.0,
+        verbose=True
+    )
 

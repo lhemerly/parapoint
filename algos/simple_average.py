@@ -96,10 +96,18 @@ def create_dtm_with_taichi_averaging(
     print(f"DTM Extent: X({min_x:.2f} - {max_x:.2f}), Y({min_y:.2f} - {max_y:.2f})")
 
     # Calculate DTM grid dimensions
-    # Add a small epsilon to max_x/max_y before division to ensure points on the very edge are included
-    grid_width = int(np.ceil((max_x - min_x + 1e-6) / dtm_resolution))
-    grid_height = int(np.ceil((max_y - min_y + 1e-6) / dtm_resolution))
+    grid_width = int(np.ceil((max_x - min_x) / dtm_resolution))
+    grid_height = int(np.ceil((max_y - min_y) / dtm_resolution))
 
+    # Ensure at least a 1x1 grid if there are points and extent is zero,
+    # otherwise, the previous calculation stands.
+    if ground_points_xyz.shape[0] > 0:
+        if max_x == min_x: # Typically for a single point column
+            grid_width = 1
+        if max_y == min_y: # Typically for a single point row
+            grid_height = 1
+    
+    # If after calculation, it's still zero (e.g. no points, or specific user extent)
     if grid_width <= 0 or grid_height <= 0:
         print("Error: Calculated DTM grid dimensions are invalid (<=0). Check resolution and point extent.")
         return np.array([[]], dtype=np.float32)
@@ -141,67 +149,62 @@ def create_dtm_with_taichi_averaging(
     return dtm_np # Return as (height, width) which is common for rasters
 
 # --- Example Usage ---
-if __name__ == "__main__":
-    print("--- Running Taichi DTM Averaging Example ---")
+def run_simple_average_example(
+    num_sample_points=100, # Reduced default for faster example/testing
+    extent_size=20.0,    # Reduced default
+    resolution=1.0,
+    dtm_extent_user=None,
+    nodata_value=-9999.0,
+    verbose=True # Control print statements for testing
+):
+    """Runs a full example of Simple Average DTM generation."""
+    if verbose:
+        print("--- Running Taichi DTM Averaging Example ---")
     
-    # 1. Create some sample ground points (replace with your actual data loading)
-    # Format: N points, each [X, Y, Z]
-    num_sample_points = 100000
-    # Simulate points within a 100x100 area
-    sample_points = np.random.rand(num_sample_points, 3).astype(np.float32) * 100.0
-    # Give some Z variation
-    sample_points[:, 2] = sample_points[:, 2] * 0.1 + np.sin(sample_points[:, 0]/10) * 5 + np.cos(sample_points[:,1]/10) * 5 
+    # 1. Create some sample ground points
+    sample_points = np.random.rand(num_sample_points, 3).astype(np.float32) * extent_size
+    if num_sample_points > 0: # Avoid division by zero if num_sample_points is 0
+        sample_points[:, 2] = (np.sin(sample_points[:, 0] / (extent_size/10 if extent_size > 0 else 1.0)) * 5 +
+                               np.cos(sample_points[:, 1] / (extent_size/10 if extent_size > 0 else 1.0)) * 5 +
+                               sample_points[:, 2] * 0.1) # Give some Z variation
     
-    print(f"Generated {sample_points.shape[0]} sample points.")
+    if verbose:
+        print(f"Generated {sample_points.shape[0]} sample points.")
 
-    # 2. Define DTM parameters
-    resolution = 1.0  # 1 meter resolution
-    
-    # Optional: define a specific extent. If None, it will be auto-calculated.
-    # extent = (0.0, 0.0, 100.0, 100.0) 
-    extent = None 
-
-    # 3. Create the DTM
+    # 2. Create the DTM
     dtm_array = create_dtm_with_taichi_averaging(
         sample_points,
         resolution,
-        dtm_extent_user=extent,
-        nodata_value=-9999.0
+        dtm_extent_user=dtm_extent_user,
+        nodata_value=nodata_value
     )
 
-    # 4. Output information about the DTM
-    if dtm_array.size > 0:
-        print(f"\nGenerated DTM shape: {dtm_array.shape}") # (height, width)
-        print(f"DTM min value: {np.min(dtm_array[dtm_array != -9999.0]):.2f}")
-        print(f"DTM max value: {np.max(dtm_array):.2f}")
-        num_nodata_cells = np.sum(dtm_array == -9999.0)
-        print(f"Number of NoData cells: {num_nodata_cells} out of {dtm_array.size} total cells")
+    # 3. Output information about the DTM (if verbose)
+    if verbose:
+        if dtm_array.size > 0:
+            print(f"\nGenerated DTM shape: {dtm_array.shape}") # (height, width)
+            valid_dtm_values = dtm_array[dtm_array != nodata_value]
+            if valid_dtm_values.size > 0:
+                print(f"DTM min value (excluding NoData): {np.min(valid_dtm_values):.2f}")
+                print(f"DTM max value (excluding NoData): {np.max(valid_dtm_values):.2f}") # Max of valid
+            else:
+                print("DTM contains only NoData values.")
+            num_nodata_cells = np.sum(dtm_array == nodata_value)
+            print(f"Number of NoData cells: {num_nodata_cells} out of {dtm_array.size} total cells ({num_nodata_cells/dtm_array.size*100:.1f}%)")
+        else:
+            print("DTM generation resulted in an empty array.")
+    
+    return dtm_array
 
-        # Optional: Save to a simple text file for viewing (not a GeoTIFF)
-        # np.savetxt("dtm_taichi_output.txt", dtm_array, fmt="%.2f")
-        # print("Saved DTM to dtm_taichi_output.txt (for basic inspection)")
-        
-        # To save as a GeoTIFF, you would use rasterio:
-        # import rasterio
-        # from rasterio.transform import from_origin
-        # min_x_dtm_final = np.min(sample_points[:,0]) if extent is None else extent[0]
-        # max_y_dtm_final = np.max(sample_points[:,1]) if extent is None else extent[3] # Note: from_origin uses top-left corner
-        # transform = from_origin(min_x_dtm_final, max_y_dtm_final, resolution, resolution)
-        # with rasterio.open(
-        #     'dtm_taichi_output.tif',
-        #     'w',
-        #     driver='GTiff',
-        #     height=dtm_array.shape[0],
-        #     width=dtm_array.shape[1],
-        #     count=1,
-        #     dtype=dtm_array.dtype,
-        #     crs='EPSG:XXXX',  # REPLACE WITH YOUR ACTUAL EPSG CODE
-        #     transform=transform,
-        #     nodata=-9999.0
-        # ) as dst:
-        #     dst.write(dtm_array, 1)
-        # print("Saved DTM to dtm_taichi_output.tif (requires rasterio and a defined CRS)")
-
-    else:
-        print("DTM generation resulted in an empty array.")
+if __name__ == "__main__":
+    # Run with default parameters for the main execution.
+    # These can be larger/more demanding than the test version.
+    run_simple_average_example(
+        num_sample_points=100000,
+        extent_size=100.0, # Original example extent
+        resolution=1.0,
+        dtm_extent_user=None, # Original example extent was None
+        nodata_value=-9999.0,
+        verbose=True
+    )
 
