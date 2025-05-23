@@ -54,15 +54,15 @@ def idw_interpolation_kernel(
         search_min_gy_float = (cell_center_y - search_radius - index_min_y) / index_resolution
         search_max_gy_float = (cell_center_y + search_radius - index_min_y) / index_resolution
         
-        min_gix = ti.max(0, ti.floor(search_min_gx_float))
-        max_gix = ti.min(index_grid_dim_x - 1, ti.floor(search_max_gx_float))
-        min_giy = ti.max(0, ti.floor(search_min_gy_float))
-        max_giy = ti.min(index_grid_dim_y - 1, ti.floor(search_max_gy_float))
+        min_gix = ti.cast(ti.max(0, ti.floor(search_min_gx_float)), ti.i32)
+        max_gix = ti.cast(ti.min(index_grid_dim_x - 1, ti.floor(search_max_gx_float)), ti.i32)
+        min_giy = ti.cast(ti.max(0, ti.floor(search_min_gy_float)), ti.i32)
+        max_giy = ti.cast(ti.min(index_grid_dim_y - 1, ti.floor(search_max_gy_float)), ti.i32)
 
         # 2. Iterate through candidate index cells
-        for cur_gix_loop in range(ti.cast(min_gix, ti.i32), ti.cast(max_gix, ti.i32) + 1):
+        for cur_gix_loop in range(min_gix, max_gix + 1):
             if found_exact_match: break 
-            for cur_giy_loop in range(ti.cast(min_giy, ti.i32), ti.cast(max_giy, ti.i32) + 1):
+            for cur_giy_loop in range(min_giy, max_giy + 1):
                 if found_exact_match: break 
 
                 # Ensure cur_gix, cur_giy are within valid index grid bounds
