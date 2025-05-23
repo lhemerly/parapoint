@@ -44,7 +44,7 @@ def test_simple_average_nodata():
 # Test with multiple points in one cell
 def test_simple_average_multiple_points_in_cell():
     points = np.array([[0.5, 0.5, 10], [0.6, 0.6, 20]], dtype=np.float32)
-    # Default extent: min_x=0.5,max_x=0.6 -> ceil(0.1+1e-6 / 1)=1. min_y=0.5,max_y=0.6 -> ceil(0.1+1e-6 / 1)=1. Shape (1,1)
+    # Default extent: min_x=0.5, max_x=0.6 -> ceil((0.6 - 0.5) / 1) = 1. min_y=0.5, max_y=0.6 -> ceil((0.6 - 0.5) / 1) = 1. Shape (1,1)
     dtm = create_dtm_with_taichi_averaging(points, 1.0)
     assert dtm.shape == (1,1) # Original simple_average logic with +1e-6
     assert dtm[0, 0] == 15 # Average of 10 and 20
