@@ -186,7 +186,7 @@ def run_simple_average_example(
             valid_dtm_values = dtm_array[dtm_array != nodata_value]
             if valid_dtm_values.size > 0:
                 print(f"DTM min value (excluding NoData): {np.min(valid_dtm_values):.2f}")
-                print(f"DTM max value (excluding NoData): {np.max(dtm_array[valid_dtm_values != nodata_value]):.2f}") # Max of valid
+                print(f"DTM max value (excluding NoData): {np.max(valid_dtm_values):.2f}") # Max of valid
             else:
                 print("DTM contains only NoData values.")
             num_nodata_cells = np.sum(dtm_array == nodata_value)
