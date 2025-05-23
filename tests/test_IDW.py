@@ -39,7 +39,6 @@ def test_idw_nodata():
     # Grid calc in IDW.py is max(1, ceil(...))
     # For a single point, grid is 1x1.
     # To test nodata at dtm[0,1], we need a grid of at least 1x2.
-    # To test nodata at dtm[0,1], we need a grid of at least 1x2.
     # Extent (0,0,2,1) & res=1.0 -> grid_width=max(1,ceil(2/1))=2, grid_height=max(1,ceil(1/1))=1. Shape (1,2)
     # Cell (0,0) center for x is 0.5. Cell (0,1) center for x is 1.5.
     # Point (0.5,0.5) is in Cell (0,0). Search radius 0.1.
