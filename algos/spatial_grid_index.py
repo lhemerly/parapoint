@@ -77,7 +77,7 @@ def populate_indexed_points_kernel(
 
 # --- SPATIAL GRID INDEX CLASS ---
 
-
+@ti.data_oriented
 class SpatialGridIndex:
     def __init__(
         self,
