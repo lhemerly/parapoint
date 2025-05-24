@@ -204,7 +204,7 @@ def run_idw_example(
         resolution,
         idw_search_radius,
         power=idw_power,
-        dtm_extent_user=user_defined_extent,
+        dtm_extent_user=dtm_extent_user,
         nodata_value=nodata_value
     )
 
@@ -234,7 +234,7 @@ if __name__ == "__main__":
         resolution=1.0,
         idw_search_radius=5.0,
         idw_power=2.0,
-        user_defined_extent=None,
+        dtm_extent_user=None,
         nodata_value=-9999.0,
         verbose=True
     )

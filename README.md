@@ -13,33 +13,6 @@ The library provides methods for creating Digital Terrain Models (DTMs) from uno
 - **NumPy Integration:** Accepts and returns NumPy arrays, making it easy to integrate into existing Python workflows.
 - **Customizable:** Allows control over DTM resolution, extent, search radius (for IDW), and nodata values.
 
-## Installation
-
-To use Parapoint, you need to have Python installed (>=3.13 recommended) along with NumPy and Taichi.
-
-1.  **Clone the repository (if applicable) or install directly.**
-
-    If you have the source code, you can install it locally using `uv`:
-
-    ```bash
-    uv pip install .
-    ```
-
-    (This assumes you have a `pyproject.toml` file set up for installation.)
-
-2.  **Install dependencies:**
-
-    The necessary dependencies are listed in `pyproject.toml`. You can create a virtual environment and install them using `uv`:
-
-    ```bash
-    uv venv  # Create a virtual environment (e.g., .venv)
-    source .venv/bin/activate  # Activate the virtual environment (Linux/macOS)
-    # For Windows: .venv\\Scripts\\activate
-    uv pip install -r requirements.txt  # If you have a requirements.txt
-    # Or, if your dependencies are managed by pyproject.toml directly:
-    uv pip install numpy taichi
-    ```
-
 ## Usage
 
 Here's a basic example of how to use Parapoint:
