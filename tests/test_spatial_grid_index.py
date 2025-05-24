@@ -28,7 +28,7 @@ class TestSpatialGridIndex(unittest.TestCase):
             )
         except Exception as e:
             # Log the error and re-raise to ensure the test framework knows setup failed.
-            print(f"Critical error during Taichi reset/re-initialization in setUp: {e}")
+            self.fail()
             raise
 
     # 1. Initialization & Basic Properties
