@@ -248,7 +248,7 @@ def run_idw_example(
         resolution,
         idw_search_radius,
         power=idw_power,
-        dtm_extent_user=dtm_extent_user, # Pass the renamed variable
+        dtm_extent_user=dtm_extent_user,
         nodata_value=nodata_value
     )
 
@@ -275,7 +275,7 @@ if __name__ == "__main__":
         resolution=1.0,
         idw_search_radius=5.0,
         idw_power=2.0,
-        dtm_extent_user=None, # Use None to auto-calculate from points
+        dtm_extent_user=None,
         nodata_value=-9999.0,
         verbose=True
     )
