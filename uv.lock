@@ -204,6 +204,8 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "numpy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
     { name = "taichi" },
 ]
 
@@ -216,7 +218,9 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=1.20" },
+    { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7.0" },
+    { name = "pytest-cov", specifier = ">=6.1.1" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=3.0" },
     { name = "taichi", specifier = ">=1.7.0" },
 ]

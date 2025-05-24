@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.10" # Assuming Taichi and your code are compatible. Check Taichi's specific Python version requirements if issues arise.
 dependencies = [
     "numpy>=1.20", # Specify a reasonable minimum version
-    "taichi>=1.7.0"  # Specify a reasonable minimum version for Taichi
+    "pytest>=8.3.5", # Specify a reasonable minimum version for Taichi
+    "pytest-cov>=6.1.1",
+    "taichi>=1.7.0",
 ]
 
 [project.optional-dependencies]
