@@ -78,29 +78,24 @@ def test_idw_kernel_point_very_close():
     """Test IDW kernel with a point very close to cell center (dist < 1e-6)."""
     # Cell center (0.5,0.5). Point is slightly offset.
     # dist = sqrt( (1e-7)^2 + 0 ) = 1e-7. This is < 1e-6.
-    # The kernel has `if dist > 1e-6: weight = 1.0 / (dist**power_p)`
-    # If dist is too small, it might get skipped or cause issues if not handled.
-    # The current kernel logic would skip weighting if dist <= 1e-6 but not an exact match.
-    # This means it might fall through to nodata if it's the only point.
-    # Let's test this behavior.
+    # Very small distances should be treated as exact matches so interpolation does
+    # not fall through to nodata due to floating point thresholding.
     offset = 1e-7
     points = np.array([[0.5 + offset, 0.5, 50.0]], dtype=np.float32)
     dtm_extent = (0.0, 0.0, 1.0, 1.0)
     nodata_val = -123.0
-    # With search_radius=1.0, this point is found.
-    # dist = 1e-7. This is NOT > 1e-6. So sum_weights remains 0. Cell gets nodata.
+    # With search_radius=1.0, this point should be treated as an exact match.
     dtm = idw(points, 1.0, 1.0, dtm_extent_user=dtm_extent, nodata_value=nodata_val)
     assert dtm.shape == (1, 1)
-    assert dtm[0, 0] == nodata_val
+    assert dtm[0, 0] == 50.0
 
     # What if there's another point further away that IS processed?
-    # Point1: (0.5 + 1e-7, 0.5, 50.0) -> dist=1e-7, skipped by `dist > 1e-6`
-    # Point2: (0.0, 0.0, 10.0) -> dist to cell center (0.5,0.5) is sqrt(0.5^2+0.5^2) = sqrt(0.5) approx 0.707
-    # This point *will* be weighted.
+    # Point1 is near-exact and should dominate as an exact match.
+    # Point2 is farther away and should not be considered once an exact match is found.
     points_2 = np.array([[0.5 + offset, 0.5, 50.0], [0.0, 0.0, 10.0]], dtype=np.float32)
     dtm_2 = idw(points_2, 1.0, 1.0, dtm_extent_user=dtm_extent, nodata_value=nodata_val)
     assert dtm_2.shape == (1, 1)
-    assert dtm_2[0, 0] == 10.0  # Only the second point contributes
+    assert dtm_2[0, 0] == 50.0
 
 
 def test_idw_kernel_no_suitable_neighbors():
