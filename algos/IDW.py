@@ -112,10 +112,15 @@ def idw_interpolation_kernel(
 
                         if dist_sq < search_radius**2:
                             dist = ti.sqrt(dist_sq)
-                            if dist > 1e-6:
-                                weight = 1.0 / (dist**power_p)
-                                sum_weighted_z += weight * pz
-                                sum_weights += weight
+                            if dist <= 1e-6:
+                                # Treat near-zero distances as exact matches to avoid
+                                # numerical instability and dropping valid close points.
+                                exact_match_z = pz
+                                found_exact_match = True
+                                break
+                            weight = 1.0 / (dist**power_p)
+                            sum_weighted_z += weight * pz
+                            sum_weights += weight
                 if found_exact_match:
                     break
             if found_exact_match:
