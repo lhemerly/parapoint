@@ -145,8 +145,10 @@ class SpatialGridIndex:
         original_indices_np = np.arange(self.num_points, dtype=np.int32)
 
         # Convert to Taichi ndarrays for kernel calls
-        points_x_ti = ti.ndarray(ti.f32, shape=self.num_points)
-        points_y_ti = ti.ndarray(ti.f32, shape=self.num_points)
+        self.points_x_ti = ti.ndarray(ti.f32, shape=self.num_points)
+        points_x_ti = self.points_x_ti
+        self.points_y_ti = ti.ndarray(ti.f32, shape=self.num_points)
+        points_y_ti = self.points_y_ti
         original_indices_ti = ti.ndarray(ti.i32, shape=self.num_points)
         points_x_ti.from_numpy(self.points_x_np)
         points_y_ti.from_numpy(self.points_y_np)
@@ -306,43 +308,67 @@ class SpatialGridIndex:
         max_cell_x = min(self.grid_dim_x - 1, max_cell_x)
         max_cell_y = min(self.grid_dim_y - 1, max_cell_y)
 
+
+        # Optimize candidate fetching by avoiding redundant Taichi field to numpy conversions
+        if not hasattr(self, '_cell_offsets_np'):
+            self._cell_offsets_np = self.cell_offsets.to_numpy()
+            self._cell_counts_np = self.cell_point_counts.to_numpy()
+            self._all_indices_np = self.indexed_point_indices.to_numpy()
+
+        cell_offsets_np = self._cell_offsets_np
+        cell_counts_np = self._cell_counts_np
+        all_indices_np = self._all_indices_np
+
         candidate_indices_list = []
         for cur_cell_x in range(min_cell_x, max_cell_x + 1):
             for cur_cell_y in range(min_cell_y, max_cell_y + 1):
-                # query_points_in_cell handles boundary checks internally,
-                # but here cur_cell_x/y are already clamped.
-                points_in_this_cell = self.query_points_in_cell(cur_cell_x, cur_cell_y)
-                if points_in_this_cell.size > 0:
+                count = cell_counts_np[cur_cell_x, cur_cell_y]
+                if count > 0:
+                    start_offset = cell_offsets_np[cur_cell_x, cur_cell_y]
+                    points_in_this_cell = all_indices_np[start_offset:start_offset+count]
                     candidate_indices_list.append(points_in_this_cell)
 
         if not candidate_indices_list:
             return np.array([], dtype=np.int32)
+
+        total_candidates = sum(c.size for c in candidate_indices_list)
+        # Allocate persistent buffer for candidates if it doesn't exist
+        if not hasattr(self, '_candidate_buffer') or self._candidate_buffer.shape[0] < total_candidates:
+            self._candidate_buffer = ti.ndarray(ti.i32, shape=int(total_candidates * 1.5))
 
         candidate_indices_np = np.concatenate(candidate_indices_list)
         if candidate_indices_np.size == 0:  # Should be caught by previous check
             return np.array([], dtype=np.int32)
 
         # Convert NumPy arrays to Taichi ndarrays for the kernel
-        candidate_indices_ti = ti.ndarray(ti.i32, shape=candidate_indices_np.shape[0])
-        candidate_indices_ti.from_numpy(candidate_indices_np)
+        candidate_indices_ti = self._candidate_buffer
+        if not hasattr(self, '_tmp_buffer') or self._tmp_buffer.shape[0] < self._candidate_buffer.shape[0]:
+            self._tmp_buffer = np.zeros(self._candidate_buffer.shape[0], dtype=np.int32)
 
-        # These are the full original coordinate arrays
-        points_x_coords_ti = ti.ndarray(ti.f32, shape=self.points_x_np.shape[0])
-        points_y_coords_ti = ti.ndarray(ti.f32, shape=self.points_y_np.shape[0])
-        points_x_coords_ti.from_numpy(self.points_x_np)
-        points_y_coords_ti.from_numpy(self.points_y_np)
+        if candidate_indices_np.shape[0] < self._candidate_buffer.shape[0]:
+            self._tmp_buffer[:candidate_indices_np.shape[0]] = candidate_indices_np
+            candidate_indices_ti.from_numpy(self._tmp_buffer)
+        else:
+            candidate_indices_ti.from_numpy(candidate_indices_np)
+
+        # These are the full original coordinate arrays (already stored as taichi ndarrays in init)
+        pass
 
         # Output buffer for results from kernel, same size as candidates
-        result_buffer_ti = ti.ndarray(ti.i32, shape=candidate_indices_np.shape[0])
+        if not hasattr(self, '_result_buffer') or self._result_buffer.shape[0] < total_candidates:
+            self._result_buffer = ti.ndarray(ti.i32, shape=int(total_candidates * 1.5))
+        result_buffer_ti = self._result_buffer
 
-        result_count_ti = ti.field(dtype=ti.i32, shape=())
+        if not hasattr(self, '_result_count'):
+            self._result_count = ti.field(dtype=ti.i32, shape=())
+        result_count_ti = self._result_count
         result_count_ti.fill(0)
 
         self._radius_query_filter_kernel(
             candidate_indices_np.shape[0],
             candidate_indices_ti,
-            points_x_coords_ti,
-            points_y_coords_ti,
+            self.points_x_ti,
+            self.points_y_ti,
             float(query_x),
             float(query_y),
             float(radius**2),
