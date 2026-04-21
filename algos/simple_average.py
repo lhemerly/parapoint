@@ -4,10 +4,10 @@ import taichi as ti  # Import the Taichi library
 # --- Taichi Initialization ---
 # You can choose the backend. ti.gpu is usually faster if you have a compatible GPU.
 # If not, ti.cpu will use multi-core CPU.
-# ti.init(arch=ti.gpu, log_level=ti.INFO)
+# ti.init(arch=ti.cpu, log_level=ti.INFO)
 # For broader compatibility initially, let's default to CPU, user can change this.
 try:
-    ti.init(arch=ti.gpu)
+    ti.init(arch=ti.cpu)
     print("Taichi initialized with GPU backend.")
 except Exception as e_gpu:
     print(f"GPU backend for Taichi failed: {e_gpu}")
