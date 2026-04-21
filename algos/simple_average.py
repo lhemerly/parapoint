@@ -99,9 +99,16 @@ def simple(
 
     print(f"DTM Extent: X({min_x:.2f} - {max_x:.2f}), Y({min_y:.2f} - {max_y:.2f})")
 
+    if dtm_resolution <= 0:
+        raise ValueError("DTM resolution must be strictly positive.")
+
     # Calculate DTM grid dimensions
     grid_width = int(np.ceil((max_x - min_x) / dtm_resolution))
     grid_height = int(np.ceil((max_y - min_y) / dtm_resolution))
+
+    # Validate grid dimensions to prevent Uncontrolled Memory Allocation (DoS)
+    if grid_width * grid_height > 100_000_000:
+        raise ValueError(f"Calculated grid dimensions ({grid_width}x{grid_height}) exceed maximum allowed limits.")
 
     # Ensure at least a 1x1 grid if there are points and extent is zero,
     # otherwise, the previous calculation stands.
