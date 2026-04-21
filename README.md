@@ -10,6 +10,8 @@ The library provides methods for creating Digital Terrain Models (DTMs) from uno
 - **Multiple Algorithms:** Includes:
     - **Inverse Distance Weighting (IDW):** A common method for interpolating scattered data points.
     - **Simple Averaging:** A basic gridding approach that averages Z values of points falling within each grid cell.
+    - **Min/Max Elevation:** Rapidly compute minimum (bare-earth) or maximum (canopy/surface) elevation models from unclassified points.
+- **Terrain Analysis:** Includes functions to compute `hillshade` and `slope` from DTMs/DSMs directly using Taichi.
 - **NumPy Integration:** Accepts and returns NumPy arrays, making it easy to integrate into existing Python workflows.
 - **Customizable:** Allows control over DTM resolution, extent, search radius (for IDW), and nodata values.
 
@@ -71,7 +73,31 @@ if dtm_idw.size > 0:
 else:
     print("IDW DTM is empty.")
 
-# Further processing or visualization of dtm_avg or dtm_idw can be done here.
+# --- Using Min/Max Elevation ---
+print("\n--- Running Min Elevation DTM (Bare-Earth proxy) --- ")
+dtm_min = parapoint.min_elevation(
+    ground_points_xyz=ground_points,
+    dtm_resolution=dtm_resolution,
+    nodata_value=-9999.0
+)
+
+if dtm_min.size > 0:
+    print(f"Min Elevation DTM shape: {dtm_min.shape}")
+    valid_min_values = dtm_min[dtm_min != -9999.0]
+    if valid_min_values.size > 0:
+        print(f"Min/Max (min_elevation): {np.min(valid_min_values):.2f} / {np.max(valid_min_values):.2f}")
+
+# --- Terrain Analysis: Hillshade and Slope ---
+print("\n--- Running Terrain Analysis --- ")
+# Generate a hillshade map from the IDW DTM for visualization
+if dtm_idw.size > 0 and np.any(dtm_idw != -9999.0):
+    hillshade_map = parapoint.hillshade(dtm_idw, resolution=dtm_resolution)
+    slope_map = parapoint.slope(dtm_idw, resolution=dtm_resolution)
+
+    print(f"Hillshade shape: {hillshade_map.shape}")
+    print(f"Slope shape: {slope_map.shape}")
+
+# Further processing or visualization of dtm_avg, dtm_idw, hillshade_map, or slope_map can be done here.
 # For example, using matplotlib or a GIS library like rasterio to save as GeoTIFF.
 
 # Example: Basic plot with Matplotlib (optional)
@@ -124,6 +150,53 @@ def create_dtm_with_taichi_idw(
 -   `power`: The power parameter for IDW (typically 1, 2, or 3).
 -   `dtm_extent_user` (optional): Tuple `(min_x, min_y, max_x, max_y)` to define the DTM area. If `None`, it's calculated from input points.
 -   `nodata_value`: Value for DTM cells with no points within the search radius.
+
+### `min_elevation` and `max_elevation`
+
+```python
+def min_elevation(
+    ground_points_xyz: np.ndarray,
+    dtm_resolution: float,
+    dtm_extent_user: tuple = None,
+    nodata_value: float = -9999.0
+) -> np.ndarray:
+
+def max_elevation(
+    ground_points_xyz: np.ndarray,
+    dtm_resolution: float,
+    dtm_extent_user: tuple = None,
+    nodata_value: float = -9999.0
+) -> np.ndarray:
+```
+
+Creates a raster by extracting the minimum (useful for proxy bare-earth) or maximum (useful for proxy surface models) Z value of all points falling within each grid cell.
+
+### `hillshade`
+
+```python
+def hillshade(
+    dtm: np.ndarray,
+    resolution: float,
+    azimuth: float = 315.0,
+    altitude: float = 45.0,
+    z_factor: float = 1.0,
+    nodata_value: float = -9999.0
+) -> np.ndarray:
+```
+
+Calculates the hillshade of a DTM/DSM for 3D visualization. Returns a numpy array with values clamped to `[0, 255]`.
+
+### `slope`
+
+```python
+def slope(
+    dtm: np.ndarray,
+    resolution: float,
+    nodata_value: float = -9999.0
+) -> np.ndarray:
+```
+
+Calculates the slope of a DTM/DSM in degrees using Horn's method.
 
 ## Taichi Backend
 
