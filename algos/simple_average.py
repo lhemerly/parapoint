@@ -99,6 +99,10 @@ def simple(
 
     print(f"DTM Extent: X({min_x:.2f} - {max_x:.2f}), Y({min_y:.2f} - {max_y:.2f})")
 
+    if dtm_resolution <= 0.0:
+        print("Error: dtm_resolution must be strictly positive.")
+        return np.array([[]], dtype=np.float32)
+
     # Calculate DTM grid dimensions
     grid_width = int(np.ceil((max_x - min_x) / dtm_resolution))
     grid_height = int(np.ceil((max_y - min_y) / dtm_resolution))
@@ -110,6 +114,11 @@ def simple(
             grid_width = 1
         if max_y == min_y:  # Typically for a single point row
             grid_height = 1
+
+    # Security fix: prevent massive memory allocations
+    if grid_width > 100000 or grid_height > 100000:
+        print(f"Error: Calculated DTM grid dimensions are too large ({grid_width}x{grid_height}). Uncontrolled memory allocation prevention.")
+        return np.array([[]], dtype=np.float32)
 
     # If after calculation, it's still zero (e.g. no points, or specific user extent)
     if grid_width <= 0 or grid_height <= 0:
