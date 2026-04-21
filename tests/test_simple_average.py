@@ -147,3 +147,14 @@ def test_invalid_grid_dimensions():
     # The current code's `if grid_width <= 0 or grid_height <= 0:` is primarily for safety,
     # as valid points and positive resolution usually make grid dimensions >= 1.
     # The test with invalid extent above should cover the spirit of this test.
+
+
+def test_dos_prevention_large_grid():
+    """Test that creating a massively large grid raises a ValueError."""
+    # Create points that define a huge extent with a tiny resolution
+    # This would ordinarily try to allocate a massive amount of memory
+    points = np.array([[0.0, 0.0, 0.0], [1000000.0, 1000000.0, 0.0]], dtype=np.float32)
+    resolution = 0.0001
+
+    with pytest.raises(ValueError, match="exceed the maximum allowed"):
+        simple(points, resolution)
