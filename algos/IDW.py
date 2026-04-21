@@ -7,9 +7,8 @@ from algos.spatial_grid_index import SpatialGridIndex  # Import SpatialGridIndex
 try:
     ti.init(arch=ti.gpu, log_level=ti.WARN)
     print("Taichi initialized with GPU backend.")
-except Exception as e_gpu:
-    print(f"GPU backend for Taichi failed: {e_gpu}")
-    print("Falling back to CPU backend for Taichi.")
+except Exception:
+    print("GPU backend for Taichi failed. Falling back to CPU backend.")
     ti.init(arch=ti.cpu, log_level=ti.WARN)
     print("Taichi initialized with CPU backend.")
 

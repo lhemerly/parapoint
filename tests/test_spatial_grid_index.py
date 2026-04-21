@@ -26,7 +26,7 @@ class TestSpatialGridIndex(unittest.TestCase):
             ti.init(
                 arch=ti.cpu, log_level=ti.INFO, default_fp=ti.f32, default_ip=ti.i32
             )
-        except Exception as e:
+        except Exception:
             # Log the error and re-raise to ensure the test framework knows setup failed.
             self.fail()
             raise
