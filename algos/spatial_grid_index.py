@@ -6,7 +6,7 @@ try:
     ti.init(arch=ti.gpu, log_level=ti.WARN)
     print("Taichi initialized with GPU backend for SpatialGridIndex.")
 except Exception:  # Broad exception to catch various Taichi init errors
-    ti.init(arch=ti.cpu, log_level=ti.WARN)
+    ti.init(arch=ti.gpu, log_level=ti.WARN)
     print("Taichi initialized with CPU backend for SpatialGridIndex.")
 
 # --- KERNELS ---
@@ -145,11 +145,11 @@ class SpatialGridIndex:
         original_indices_np = np.arange(self.num_points, dtype=np.int32)
 
         # Convert to Taichi ndarrays for kernel calls
-        points_x_ti = ti.ndarray(ti.f32, shape=self.num_points)
-        points_y_ti = ti.ndarray(ti.f32, shape=self.num_points)
+        self.points_x_ti = ti.ndarray(ti.f32, shape=self.num_points)
+        self.points_y_ti = ti.ndarray(ti.f32, shape=self.num_points)
         original_indices_ti = ti.ndarray(ti.i32, shape=self.num_points)
-        points_x_ti.from_numpy(self.points_x_np)
-        points_y_ti.from_numpy(self.points_y_np)
+        self.points_x_ti.from_numpy(self.points_x_np)
+        self.points_y_ti.from_numpy(self.points_y_np)
         original_indices_ti.from_numpy(original_indices_np)
 
         # 3. Initialize Taichi fields
@@ -166,13 +166,13 @@ class SpatialGridIndex:
         # 4. Call Kernel 1
         self.cell_point_counts.fill(0)
         assign_points_to_grid_and_count_kernel(
-            points_x_ti,
-            points_y_ti,
-            self.min_x,
-            self.min_y,
-            self.resolution,
-            self.grid_dim_x,
-            self.grid_dim_y,
+            self.points_x_ti,
+            self.points_y_ti,
+            float(self.min_x),
+            float(self.min_y),
+            float(self.resolution),
+            int(self.grid_dim_x),
+            int(self.grid_dim_y),
             self.cell_point_counts,
         )
 
@@ -215,14 +215,14 @@ class SpatialGridIndex:
         if total_indexed_points > 0:
             cell_current_insertion_counts.fill(0)
             populate_indexed_points_kernel(
-                points_x_ti,
-                points_y_ti,
+                self.points_x_ti,
+                self.points_y_ti,
                 original_indices_ti,
-                self.min_x,
-                self.min_y,
-                self.resolution,
-                self.grid_dim_x,
-                self.grid_dim_y,
+                float(self.min_x),
+                float(self.min_y),
+                float(self.resolution),
+                int(self.grid_dim_x),
+                int(self.grid_dim_y),
                 self.cell_offsets,
                 cell_current_insertion_counts,
                 self.indexed_point_indices,
@@ -326,12 +326,6 @@ class SpatialGridIndex:
         candidate_indices_ti = ti.ndarray(ti.i32, shape=candidate_indices_np.shape[0])
         candidate_indices_ti.from_numpy(candidate_indices_np)
 
-        # These are the full original coordinate arrays
-        points_x_coords_ti = ti.ndarray(ti.f32, shape=self.points_x_np.shape[0])
-        points_y_coords_ti = ti.ndarray(ti.f32, shape=self.points_y_np.shape[0])
-        points_x_coords_ti.from_numpy(self.points_x_np)
-        points_y_coords_ti.from_numpy(self.points_y_np)
-
         # Output buffer for results from kernel, same size as candidates
         result_buffer_ti = ti.ndarray(ti.i32, shape=candidate_indices_np.shape[0])
 
@@ -339,10 +333,10 @@ class SpatialGridIndex:
         result_count_ti.fill(0)
 
         self._radius_query_filter_kernel(
-            candidate_indices_np.shape[0],
+            int(candidate_indices_np.shape[0]),
             candidate_indices_ti,
-            points_x_coords_ti,
-            points_y_coords_ti,
+            self.points_x_ti,
+            self.points_y_ti,
             float(query_x),
             float(query_y),
             float(radius**2),

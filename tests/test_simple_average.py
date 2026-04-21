@@ -1,4 +1,3 @@
-import pytest
 import numpy as np
 from algos.simple_average import simple
 # Removed common_taichi import and _reset calls
