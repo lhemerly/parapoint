@@ -166,12 +166,19 @@ def idw(
 
     print(f"DTM Extent: X({min_x:.2f} - {max_x:.2f}), Y({min_y:.2f} - {max_y:.2f})")
 
+    if dtm_resolution <= 0:
+        raise ValueError("DTM resolution must be strictly positive.")
+
     # DTM grid dimensions calculation
     # Using min_x, min_y from user/points and calculated width/height to derive actual DTM grid coverage
     min_x_dtm_grid = min_x
     min_y_dtm_grid = min_y
     grid_width = max(1, int(np.ceil((max_x - min_x_dtm_grid) / dtm_resolution)))
     grid_height = max(1, int(np.ceil((max_y - min_y_dtm_grid) / dtm_resolution)))
+
+    # Validate grid dimensions to prevent Uncontrolled Memory Allocation (DoS)
+    if grid_width * grid_height > 100_000_000:
+        raise ValueError(f"Calculated grid dimensions ({grid_width}x{grid_height}) exceed maximum allowed limits.")
 
     # actual_max_x/y for DTM grid (used for SpatialGridIndex extent if it aligns with DTM)
     actual_dtm_grid_max_x = min_x_dtm_grid + grid_width * dtm_resolution
