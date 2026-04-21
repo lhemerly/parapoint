@@ -5,7 +5,7 @@ from algos.spatial_grid_index import SpatialGridIndex  # Import SpatialGridIndex
 
 # --- Taichi Initialization ---
 try:
-    ti.init(arch=ti.cpu, log_level=ti.WARN)
+    ti.init(arch=ti.gpu, log_level=ti.WARN)
     print("Taichi initialized with GPU backend.")
 except Exception as e_gpu:
     print(f"GPU backend for Taichi failed: {e_gpu}")
@@ -172,10 +172,6 @@ def idw(
     min_y_dtm_grid = min_y
     grid_width = max(1, int(np.ceil((max_x - min_x_dtm_grid) / dtm_resolution)))
     grid_height = max(1, int(np.ceil((max_y - min_y_dtm_grid) / dtm_resolution)))
-
-    # actual_max_x/y for DTM grid (used for SpatialGridIndex extent if it aligns with DTM)
-    actual_dtm_grid_max_x = min_x_dtm_grid + grid_width * dtm_resolution
-    actual_dtm_grid_max_y = min_y_dtm_grid + grid_height * dtm_resolution
 
     if grid_width <= 0 or grid_height <= 0:
         print("Error: Calculated DTM grid dimensions are invalid (<=0).")
