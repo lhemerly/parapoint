@@ -45,6 +45,18 @@ def test_idw_nodata():
     assert dtm[0, 0] != -1  # This cell should have data
 
 
+def test_idw_dos_prevention():
+    """Test that extremely large grid dimensions due to tiny resolution or large extent are prevented."""
+    points = np.array([[0.0, 0.0, 10.0], [1000.0, 1000.0, 20.0]], dtype=np.float32)
+    # Resolution of 1e-4 with 1000 extent -> 10,000,000 grid cells per dimension (over max 100,000)
+    dtm = idw(points, 1e-4, 1.0)
+    assert dtm.shape == (1, 0)
+
+    # Test zero or negative resolution
+    dtm_zero_res = idw(points, 0.0, 1.0)
+    assert dtm_zero_res.shape == (1, 0)
+
+
 # Test with different power
 def test_idw_different_power():
     points = np.array([[0.5, 0.5, 10], [1.5, 1.5, 20]], dtype=np.float32)

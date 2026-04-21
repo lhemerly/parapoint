@@ -45,6 +45,18 @@ def test_simple_average_nodata():
     assert dtm[0, 1] == -1  # This cell should be nodata
 
 
+def test_simple_average_dos_prevention():
+    """Test that extremely large grid dimensions due to tiny resolution or large extent are prevented."""
+    points = np.array([[0.0, 0.0, 10.0], [1000.0, 1000.0, 20.0]], dtype=np.float32)
+    # Resolution of 1e-4 with 1000 extent -> 10,000,000 grid cells per dimension
+    dtm = simple(points, 1e-4)
+    assert dtm.shape == (1, 0)
+
+    # Test zero resolution
+    dtm_zero_res = simple(points, 0.0)
+    assert dtm_zero_res.shape == (1, 0)
+
+
 # Test with multiple points in one cell
 def test_simple_average_multiple_points_in_cell():
     points = np.array([[0.5, 0.5, 10], [0.6, 0.6, 20]], dtype=np.float32)
