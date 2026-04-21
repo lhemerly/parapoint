@@ -118,6 +118,16 @@ def simple(
         )
         return np.array([[]], dtype=np.float32)
 
+    # Security fix: Prevent uncontrolled memory allocation (DoS)
+    # A 100,000,000 cell grid uses roughly ~800MB (two 32-bit fields + one 32-bit final array)
+    MAX_GRID_CELLS = 100_000_000
+    if grid_width * grid_height > MAX_GRID_CELLS:
+        raise ValueError(
+            f"Calculated DTM grid dimensions ({grid_width}x{grid_height} = {grid_width * grid_height} cells) "
+            f"exceed the maximum allowed ({MAX_GRID_CELLS} cells). "
+            "Please increase dtm_resolution or reduce the user extent."
+        )
+
     print(f"DTM Grid Dimensions: {grid_width} (width) x {grid_height} (height) cells")
 
     # Initialize Taichi fields for sum of Z and counts
