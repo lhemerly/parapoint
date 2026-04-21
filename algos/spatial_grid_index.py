@@ -117,6 +117,11 @@ class SpatialGridIndex:
             self.cell_point_counts.fill(0)
             self.cell_offsets.fill(0)
             self.indexed_point_indices.fill(0)
+
+            # Cache NumPy arrays
+            self.indexed_point_indices_np = np.array([], dtype=np.int32)
+            self.cell_offsets_np = np.array([[]], dtype=np.int32)
+            self.cell_point_counts_np = np.array([[]], dtype=np.int32)
             return
 
         # 1. Determine extent and grid dimensions
@@ -228,6 +233,12 @@ class SpatialGridIndex:
                 self.indexed_point_indices,
             )
 
+        # Optimization: Pre-cache NumPy arrays to avoid repetitive .to_numpy() calls inside query methods
+        # No ti.sync() is needed here because .to_numpy() intrinsically triggers a synchronization point.
+        self.indexed_point_indices_np = self.indexed_point_indices.to_numpy()
+        self.cell_offsets_np = self.cell_offsets.to_numpy()
+        self.cell_point_counts_np = self.cell_point_counts.to_numpy()
+
     def get_cell_indices(self, x: float, y: float) -> tuple[int, int]:
         cell_idx = int(ti.floor((x - self.min_x) / self.resolution))
         cell_idy = int(ti.floor((y - self.min_y) / self.resolution))
@@ -243,22 +254,17 @@ class SpatialGridIndex:
         ):
             return np.array([], dtype=np.int32)
 
-        if self.indexed_point_indices.shape[0] == 0:
+        if self.indexed_point_indices_np.shape[0] == 0:
             return np.array([], dtype=np.int32)
 
-        start_offset = self.cell_offsets[cell_x_idx, cell_y_idx]
-        count = self.cell_point_counts[cell_x_idx, cell_y_idx]
+        start_offset = self.cell_offsets_np[cell_x_idx, cell_y_idx]
+        count = self.cell_point_counts_np[cell_x_idx, cell_y_idx]
 
         if count == 0:
             return np.array([], dtype=np.int32)
 
-        # Slice the Taichi field to get results.
-        # Taichi field slicing `field[start:end]` creates a Taichi expression, not a NumPy array directly.
-        # To get a NumPy array, we need to use .to_numpy() on the whole field and then slice,
-        # or use a helper kernel to copy to a new (smaller) Taichi field/ndarray then .to_numpy().
-        # For typical use cases where this slice isn't enormous, full .to_numpy() is simpler.
-        all_indices_np = self.indexed_point_indices.to_numpy()
-        return all_indices_np[start_offset : start_offset + count].copy()
+        # Use pre-cached numpy array instead of expensive .to_numpy() on the Taichi field
+        return self.indexed_point_indices_np[start_offset : start_offset + count].copy()
 
     @ti.kernel
     def _radius_query_filter_kernel(
