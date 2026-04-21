@@ -27,11 +27,14 @@ jobs:
     - name: Install the project
       run: uv sync --python ${{ matrix.python-version }} --all-extras --dev
 
+    - name: Install Ruff
+      run: uv tool install ruff
+
     - name: Run ruff check
-      run: uv run ruff check .
+      run: ruff check .
 
     - name: Run ruff format check
-      run: uv run ruff format --check .
+      run: ruff format --check .
 
     - name: Set Taichi architecture to CPU for tests
       run: sed -i 's/ti.init(arch=ti.gpu/ti.init(arch=ti.cpu/g' algos/*.py tests/*.py
