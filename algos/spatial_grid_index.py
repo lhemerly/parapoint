@@ -3,7 +3,7 @@ import numpy as np
 
 # Taichi initialization (global, executed once on module import)
 try:
-    ti.init(arch=ti.gpu, log_level=ti.WARN)
+    ti.init(arch=ti.cpu, log_level=ti.WARN)
     print("Taichi initialized with GPU backend for SpatialGridIndex.")
 except Exception:  # Broad exception to catch various Taichi init errors
     ti.init(arch=ti.cpu, log_level=ti.WARN)

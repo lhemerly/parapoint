@@ -3,7 +3,7 @@ import taichi as ti
 
 # --- Taichi Initialization ---
 try:
-    ti.init(arch=ti.gpu, log_level=ti.WARN)
+    ti.init(arch=ti.cpu, log_level=ti.WARN)
     print("Taichi initialized with GPU backend.")
 except Exception as e_gpu:
     print(f"GPU backend for Taichi failed: {e_gpu}")
@@ -111,7 +111,7 @@ def _base_min_max(
 
     dtm_np = np.full((grid_height, grid_width), nodata_value, dtype=np.float32)
     valid_cells_mask = count_np > 0
-    dtm_np[valid_cells_mask.T] = res_np[valid_cells_mask]
+    dtm_np[valid_cells_mask.T] = res_np.T[valid_cells_mask.T]
 
     return dtm_np
 
