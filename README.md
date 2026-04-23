@@ -10,6 +10,8 @@ The library provides methods for creating Digital Terrain Models (DTMs) from uno
 - **Multiple Algorithms:** Includes:
     - **Inverse Distance Weighting (IDW):** A common method for interpolating scattered data points.
     - **Simple Averaging:** A basic gridding approach that averages Z values of points falling within each grid cell.
+- **Advanced Terrain Metrics:** Calculate Slope, Aspect, Hillshade, Topographic Position Index (TPI), and Topographic Ruggedness Index (TRI).
+- **Post-Processing & Smoothing:** Includes Taichi-accelerated Gaussian filtering for noise reduction and iterative nodata gap filling.
 - **NumPy Integration:** Accepts and returns NumPy arrays, making it easy to integrate into existing Python workflows.
 - **Customizable:** Allows control over DTM resolution, extent, search radius (for IDW), and nodata values.
 
@@ -71,7 +73,19 @@ if dtm_idw.size > 0:
 else:
     print("IDW DTM is empty.")
 
-# Further processing or visualization of dtm_avg or dtm_idw can be done here.
+# --- Applying Post-Processing ---
+print("\n--- Smoothing and Filling Nodata ---")
+# Fill small gaps
+dtm_filled = parapoint.fill_nodata(dtm_idw, max_iterations=3, radius=1, nodata_value=-9999.0)
+# Smooth noise
+dtm_smoothed = parapoint.gaussian_filter(dtm_filled, sigma=1.0, radius=2, nodata_value=-9999.0)
+
+# --- Calculating Terrain Derivatives ---
+print("\n--- Calculating TPI and TRI ---")
+tpi = parapoint.calculate_tpi(dtm_smoothed, radius=2, nodata_value=-9999.0)
+tri = parapoint.calculate_tri(dtm_smoothed, nodata_value=-9999.0)
+
+# Further processing or visualization of dtm_avg, dtm_idw, or derivatives can be done here.
 # For example, using matplotlib or a GIS library like rasterio to save as GeoTIFF.
 
 # Example: Basic plot with Matplotlib (optional)
