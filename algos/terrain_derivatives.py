@@ -190,8 +190,8 @@ def tpi_kernel(
                 mean_z = sum_z / ti.cast(count, ti.f32)
                 out_tpi[r, c] = dtm[r, c] - mean_z
             else:
-                # No valid neighbors, TPI is 0
-                out_tpi[r, c] = 0.0
+                # No valid neighbors, return nodata_value
+                out_tpi[r, c] = nodata_value
 
 
 @ti.kernel

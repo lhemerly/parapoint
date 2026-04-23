@@ -70,6 +70,22 @@ def test_tpi_empty():
     assert res.size == 0
 
 
+def test_tpi_no_valid_neighbors():
+    # Center is valid, all neighbors are nodata
+    dtm = np.array(
+        [
+            [-9999.0, -9999.0, -9999.0],
+            [-9999.0, 10.0, -9999.0],
+            [-9999.0, -9999.0, -9999.0],
+        ],
+        dtype=np.float32,
+    )
+
+    tpi = calculate_tpi(dtm, radius=1, nodata_value=-9999.0)
+    # TPI should be nodata since there are no valid neighbors
+    assert tpi[1, 1] == -9999.0
+
+
 def test_tri_basic():
     # 3x3 plane, TRI should be 0
     dtm = np.array(
