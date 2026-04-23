@@ -10,8 +10,8 @@ The library provides methods for creating Digital Terrain Models (DTMs) from uno
 - **Multiple Algorithms:** Includes:
     - **Inverse Distance Weighting (IDW):** A common method for interpolating scattered data points.
     - **Simple Averaging:** A basic gridding approach that averages Z values of points falling within each grid cell.
-- **Advanced Terrain Metrics:** Calculate Slope, Aspect, Hillshade, Topographic Position Index (TPI), and Topographic Ruggedness Index (TRI).
-- **Post-Processing & Smoothing:** Includes Taichi-accelerated Gaussian filtering for noise reduction and iterative nodata gap filling.
+    - **Min/Max Z:** DTM creation using the minimum or maximum Z values within each grid cell.
+    - **Advanced Terrain Metrics:** Calculate Slope, Aspect, Hillshade, Topographic Position Index (TPI), and Topographic Ruggedness Index (TRI).
 - **NumPy Integration:** Accepts and returns NumPy arrays, making it easy to integrate into existing Python workflows.
 - **Customizable:** Allows control over DTM resolution, extent, search radius (for IDW), and nodata values.
 
@@ -37,11 +37,13 @@ dtm_resolution = 1.0  # e.g., 1 meter resolution
 
 # --- Using Simple Averaging ---
 print("\n--- Running Simple Average DTM --- ")
-dtm_avg = parapoint.create_dtm_with_taichi_averaging(
+dtm_avg = parapoint.simple(
     ground_points_xyz=ground_points,
     dtm_resolution=dtm_resolution,
     nodata_value=-9999.0
 )
+
+# Note: parapoint.create_dtm_with_taichi_averaging is a legacy alias for parapoint.simple
 
 if dtm_avg.size > 0:
     print(f"Simple Average DTM shape: {dtm_avg.shape}")
@@ -57,13 +59,15 @@ print("\n--- Running IDW DTM --- ")
 idw_search_radius = 5.0 # Search radius for IDW
 idw_power = 2.0         # Power parameter for IDW
 
-dtm_idw = parapoint.create_dtm_with_taichi_idw(
+dtm_idw = parapoint.idw(
     ground_points_xyz=ground_points,
     dtm_resolution=dtm_resolution,
     search_radius=idw_search_radius,
     power=idw_power,
     nodata_value=-9999.0
 )
+
+# Note: parapoint.create_dtm_with_taichi_idw is a legacy alias for parapoint.idw
 
 if dtm_idw.size > 0:
     print(f"IDW DTM shape: {dtm_idw.shape}")
@@ -88,25 +92,45 @@ tri = parapoint.calculate_tri(dtm_smoothed, nodata_value=-9999.0)
 # Further processing or visualization of dtm_avg, dtm_idw, or derivatives can be done here.
 # For example, using matplotlib or a GIS library like rasterio to save as GeoTIFF.
 
-# Example: Basic plot with Matplotlib (optional)
-# import matplotlib.pyplot as plt
-# if dtm_idw.size > 0 and np.any(dtm_idw != -9999.0):
-#     plt.figure(figsize=(10, 8))
-#     plt.imshow(dtm_idw, cmap='terrain', vmin=np.min(valid_idw_values), vmax=np.max(valid_idw_values))
-#     plt.colorbar(label='Elevation (m)')
-#     plt.title('IDW Interpolated DTM')
-#     plt.xlabel('Grid X')
-#     plt.ylabel('Grid Y')
-#     plt.show()
-# else:
-#     print("Skipping plot as DTM is empty or all NoData.")
+# --- Min and Max Z DTMs ---
+print("\n--- Running Min and Max Z DTM --- ")
+dtm_min = parapoint.min_z(
+    ground_points_xyz=ground_points,
+    dtm_resolution=dtm_resolution,
+    nodata_value=-9999.0
+)
+
+dtm_max = parapoint.max_z(
+    ground_points_xyz=ground_points,
+    dtm_resolution=dtm_resolution,
+    nodata_value=-9999.0
+)
+
+
+# --- Terrain Derivatives ---
+print("\n--- Calculating Terrain Derivatives --- ")
+if dtm_idw.size > 0:
+    derivatives = parapoint.calculate_terrain_derivatives(
+        dtm=dtm_idw,
+        cell_size=dtm_resolution,
+        nodata_value=-9999.0
+    )
+    slope = derivatives['slope']
+    aspect = derivatives['aspect']
+    hillshade = derivatives['hillshade']
+    print("Derivatives computed successfully.")
+
+# Further processing or visualization of DTMs can be done here.
+# For example, using matplotlib or a GIS library like rasterio to save as GeoTIFF.
 
 ```
 
-### `create_dtm_with_taichi_averaging`
+### `parapoint.simple`
+
+*(Alias: `create_dtm_with_taichi_averaging`)*
 
 ```python
-def create_dtm_with_taichi_averaging(
+def simple(
     ground_points_xyz: np.ndarray, 
     dtm_resolution: float,
     dtm_extent_user: tuple = None, # Optional: (min_x, min_y, max_x, max_y)
@@ -119,10 +143,12 @@ def create_dtm_with_taichi_averaging(
 -   `dtm_extent_user` (optional): Tuple `(min_x, min_y, max_x, max_y)` to define the DTM area. If `None`, it's calculated from input points.
 -   `nodata_value`: Value for DTM cells with no points.
 
-### `create_dtm_with_taichi_idw`
+### `parapoint.idw`
+
+*(Alias: `create_dtm_with_taichi_idw`)*
 
 ```python
-def create_dtm_with_taichi_idw(
+def idw(
     ground_points_xyz: np.ndarray, 
     dtm_resolution: float,
     search_radius: float,
@@ -138,6 +164,47 @@ def create_dtm_with_taichi_idw(
 -   `power`: The power parameter for IDW (typically 1, 2, or 3).
 -   `dtm_extent_user` (optional): Tuple `(min_x, min_y, max_x, max_y)` to define the DTM area. If `None`, it's calculated from input points.
 -   `nodata_value`: Value for DTM cells with no points within the search radius.
+
+### `parapoint.min_z` and `parapoint.max_z`
+
+```python
+def min_z(
+    ground_points_xyz: np.ndarray,
+    dtm_resolution: float,
+    dtm_extent_user: tuple = None,
+    nodata_value: float = -9999.0,
+) -> np.ndarray:
+
+def max_z(
+    ground_points_xyz: np.ndarray,
+    dtm_resolution: float,
+    dtm_extent_user: tuple = None,
+    nodata_value: float = -9999.0,
+) -> np.ndarray:
+```
+
+-   Creates a DTM where each cell contains the minimum or maximum Z value of points within it. Arguments are similar to `parapoint.simple`.
+
+### `parapoint.calculate_terrain_derivatives`
+
+```python
+def calculate_terrain_derivatives(
+    dtm: np.ndarray,
+    cell_size: float,
+    nodata_value: float = -9999.0,
+    z_factor: float = 1.0,
+    azimuth: float = 315.0,
+    altitude: float = 45.0,
+) -> dict:
+```
+
+-   `dtm`: 2D NumPy array representing the Digital Terrain Model.
+-   `cell_size`: The resolution of the DTM.
+-   `nodata_value`: Value representing nodata in the input DTM and output arrays.
+-   `z_factor`: Vertical exaggeration factor.
+-   `azimuth`: Sun azimuth angle in degrees (default 315.0).
+-   `altitude`: Sun altitude angle in degrees (default 45.0).
+-   **Returns**: A dictionary containing `slope`, `aspect`, and `hillshade` as 2D NumPy arrays. Edge cells are assigned the nodata value.
 
 ## Taichi Backend
 
