@@ -22,8 +22,12 @@ def assign_points_to_grid_kernel(
     points_x: ti.types.ndarray(ti.f32, ndim=1),  # Input: X coordinates of points
     points_y: ti.types.ndarray(ti.f32, ndim=1),  # Input: Y coordinates of points
     points_z: ti.types.ndarray(ti.f32, ndim=1),  # Input: Z coordinates of points
-    sum_z_field: ti.template(),  # Output: Taichi field to store sum of Z values for each cell
-    count_field: ti.template(),  # Output: Taichi field to store point count for each cell
+    sum_z_field: ti.types.ndarray(
+        ti.f32, ndim=2
+    ),  # Output: Taichi ndarray to store sum of Z values for each cell
+    count_field: ti.types.ndarray(
+        ti.i32, ndim=2
+    ),  # Output: Taichi ndarray to store point count for each cell
     min_x_dtm: ti.f32,  # DTM grid minimum X
     min_y_dtm: ti.f32,  # DTM grid minimum Y
     resolution_dtm: ti.f32,  # DTM grid resolution
@@ -120,14 +124,10 @@ def simple(
 
     print(f"DTM Grid Dimensions: {grid_width} (width) x {grid_height} (height) cells")
 
-    # Initialize Taichi fields for sum of Z and counts
-    # These fields will store the accumulated values per grid cell
-    sum_z_field = ti.field(dtype=ti.f32, shape=(grid_width, grid_height))
-    count_field = ti.field(dtype=ti.i32, shape=(grid_width, grid_height))
-
-    # Reset fields to zero before processing
-    sum_z_field.fill(0.0)
-    count_field.fill(0)
+    # Pre-allocate NumPy arrays for sum of Z and counts
+    # These arrays will store the accumulated values per grid cell
+    sum_z_np = np.zeros((grid_width, grid_height), dtype=np.float32)
+    count_np = np.zeros((grid_width, grid_height), dtype=np.int32)
 
     # Call the Taichi kernel
     print("Launching Taichi kernel to assign points to grid...")
@@ -135,8 +135,8 @@ def simple(
         points_x_np,
         points_y_np,
         points_z_np,
-        sum_z_field,
-        count_field,
+        sum_z_np,
+        count_np,
         min_x,
         min_y,
         dtm_resolution,
@@ -144,10 +144,6 @@ def simple(
         grid_height,
     )
     print("Taichi kernel execution finished.")
-
-    # Convert Taichi fields back to NumPy arrays for final computation
-    sum_z_np = sum_z_field.to_numpy()
-    count_np = count_field.to_numpy()
 
     # Create the DTM: average Z where count > 0, otherwise nodata_value
     print("Calculating final DTM averages...")

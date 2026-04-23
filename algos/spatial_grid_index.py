@@ -21,7 +21,7 @@ def assign_points_to_grid_and_count_kernel(
     resolution: ti.f32,
     grid_dim_x: ti.i32,
     grid_dim_y: ti.i32,
-    cell_point_counts: ti.template(),
+    cell_point_counts: ti.types.ndarray(ti.i32, ndim=2),
 ):
     for i in range(points_x.shape[0]):
         px, py = points_x[i], points_y[i]
@@ -35,10 +35,10 @@ def assign_points_to_grid_and_count_kernel(
 
 @ti.kernel
 def calculate_offsets_kernel(
-    cell_point_counts: ti.template(),
+    cell_point_counts: ti.types.ndarray(ti.i32, ndim=2),
     grid_dim_x: ti.i32,
     grid_dim_y: ti.i32,
-    cell_offsets: ti.template(),
+    cell_offsets: ti.types.ndarray(ti.i32, ndim=2),
 ):
     current_offset = 0
     for j in range(grid_dim_y):  # Row-major
@@ -57,9 +57,9 @@ def populate_indexed_points_kernel(
     resolution: ti.f32,
     grid_dim_x: ti.i32,
     grid_dim_y: ti.i32,
-    cell_offsets: ti.template(),
-    cell_current_insertion_counts: ti.template(),
-    indexed_point_indices: ti.template(),
+    cell_offsets: ti.types.ndarray(ti.i32, ndim=2),
+    cell_current_insertion_counts: ti.types.ndarray(ti.i32, ndim=2),
+    indexed_point_indices: ti.types.ndarray(ti.i32, ndim=1),
 ):
     for i in range(points_x.shape[0]):
         px, py = points_x[i], points_y[i]
@@ -110,14 +110,9 @@ class SpatialGridIndex:
             )  # Keep logical dimensions as 0 for empty case
             self.points_x_np = np.array([], dtype=np.float32)
             self.points_y_np = np.array([], dtype=np.float32)
-            # Taichi fields need positive dimensions, so use 1x1 but never access them
-            self.cell_point_counts = ti.field(dtype=ti.i32, shape=(1, 1))
-            self.cell_offsets = ti.field(dtype=ti.i32, shape=(1, 1))
-            self.indexed_point_indices = ti.field(dtype=ti.i32, shape=1)
-            # Initialize to zero
-            self.cell_point_counts.fill(0)
-            self.cell_offsets.fill(0)
-            self.indexed_point_indices.fill(0)
+            self.cell_point_counts = np.zeros((1, 1), dtype=np.int32)
+            self.cell_offsets = np.zeros((1, 1), dtype=np.int32)
+            self.indexed_point_indices = np.zeros((1,), dtype=np.int32)
             return
 
         # 1. Determine extent and grid dimensions
@@ -153,19 +148,16 @@ class SpatialGridIndex:
         points_y_ti.from_numpy(self.points_y_np)
         original_indices_ti.from_numpy(original_indices_np)
 
-        # 3. Initialize Taichi fields
-        self.cell_point_counts = ti.field(
-            dtype=ti.i32, shape=(self.grid_dim_x, self.grid_dim_y)
+        # 3. Initialize NumPy arrays
+        self.cell_point_counts = np.zeros(
+            (self.grid_dim_x, self.grid_dim_y), dtype=np.int32
         )
-        self.cell_offsets = ti.field(
-            dtype=ti.i32, shape=(self.grid_dim_x, self.grid_dim_y)
-        )
-        cell_current_insertion_counts = ti.field(
-            dtype=ti.i32, shape=(self.grid_dim_x, self.grid_dim_y)
+        self.cell_offsets = np.zeros((self.grid_dim_x, self.grid_dim_y), dtype=np.int32)
+        cell_current_insertion_counts = np.zeros(
+            (self.grid_dim_x, self.grid_dim_y), dtype=np.int32
         )
 
         # 4. Call Kernel 1
-        self.cell_point_counts.fill(0)
         assign_points_to_grid_and_count_kernel(
             points_x_ti,
             points_y_ti,
@@ -178,7 +170,7 @@ class SpatialGridIndex:
         )
 
         if min_points_per_cell_for_debug > 0:
-            counts_np = self.cell_point_counts.to_numpy()
+            counts_np = self.cell_point_counts
             if counts_np.max() > min_points_per_cell_for_debug:
                 print(
                     f"Warning: Max points in a single cell is {counts_np.max()}, "
@@ -186,7 +178,6 @@ class SpatialGridIndex:
                 )
 
         # 5. Call Kernel 2
-        self.cell_offsets.fill(0)
         calculate_offsets_kernel(
             self.cell_point_counts, self.grid_dim_x, self.grid_dim_y, self.cell_offsets
         )
@@ -195,26 +186,21 @@ class SpatialGridIndex:
         # The total number of points is the offset of the last cell + count of the last cell
         # Or sum of all cell_point_counts
         if self.grid_dim_x > 0 and self.grid_dim_y > 0:
-            # last_cell_offset_val = self.cell_offsets[self.grid_dim_x - 1, self.grid_dim_y - 1]
-            # last_cell_count_val = self.cell_point_counts[self.grid_dim_x - 1, self.grid_dim_y - 1]
-            # total_indexed_points = last_cell_offset_val + last_cell_count_val
             # Using sum of counts is more robust if grid can be very sparse or empty
-            total_indexed_points = int(self.cell_point_counts.to_numpy().sum())
+            total_indexed_points = int(self.cell_point_counts.sum())
 
         else:  # Should not happen if num_points > 0 due to max(1, ..) for grid_dim
             total_indexed_points = 0
 
-        self.indexed_point_indices = ti.field(
-            dtype=ti.i32, shape=max(1, total_indexed_points)
-        )  # Ensure positive shape
         if total_indexed_points > 0:
-            self.indexed_point_indices.fill(-1)  # Sentinel for debugging
+            self.indexed_point_indices = np.full(
+                total_indexed_points, -1, dtype=np.int32
+            )
         else:
-            self.indexed_point_indices.fill(0)  # Fill with dummy value for empty case
+            self.indexed_point_indices = np.zeros(1, dtype=np.int32)
 
         # 7. Call Kernel 3
         if total_indexed_points > 0:
-            cell_current_insertion_counts.fill(0)
             populate_indexed_points_kernel(
                 points_x_ti,
                 points_y_ti,
@@ -253,13 +239,7 @@ class SpatialGridIndex:
         if count == 0:
             return np.array([], dtype=np.int32)
 
-        # Slice the Taichi field to get results.
-        # Taichi field slicing `field[start:end]` creates a Taichi expression, not a NumPy array directly.
-        # To get a NumPy array, we need to use .to_numpy() on the whole field and then slice,
-        # or use a helper kernel to copy to a new (smaller) Taichi field/ndarray then .to_numpy().
-        # For typical use cases where this slice isn't enormous, full .to_numpy() is simpler.
-        all_indices_np = self.indexed_point_indices.to_numpy()
-        return all_indices_np[start_offset : start_offset + count].copy()
+        return self.indexed_point_indices[start_offset : start_offset + count].copy()
 
     @ti.kernel
     def _radius_query_filter_kernel(
@@ -274,7 +254,9 @@ class SpatialGridIndex:
         query_y: ti.f32,
         radius_sq: ti.f32,
         result_indices: ti.types.ndarray(ti.i32, ndim=1),  # Output buffer
-        result_count: ti.template(),  # Atomic counter (ti.field(ti.i32, shape=()))
+        result_count: ti.types.ndarray(
+            ti.i32, ndim=1
+        ),  # Atomic counter as ndarray size 1
     ):
         for k in range(num_candidates):
             candidate_original_idx = candidate_indices[k]
@@ -283,7 +265,7 @@ class SpatialGridIndex:
 
             dist_sq = (px - query_x) ** 2 + (py - query_y) ** 2
             if dist_sq < radius_sq:
-                current_idx = ti.atomic_add(result_count[None], 1)
+                current_idx = ti.atomic_add(result_count[0], 1)
                 if current_idx < result_indices.shape[0]:
                     result_indices[current_idx] = candidate_original_idx
                 # Else: more hits than buffer, data loss. Buffer should be num_candidates.
@@ -334,10 +316,9 @@ class SpatialGridIndex:
         points_y_coords_ti.from_numpy(self.points_y_np)
 
         # Output buffer for results from kernel, same size as candidates
-        result_buffer_ti = ti.ndarray(ti.i32, shape=candidate_indices_np.shape[0])
+        result_buffer_np = np.zeros(candidate_indices_np.shape[0], dtype=np.int32)
 
-        result_count_ti = ti.field(dtype=ti.i32, shape=())
-        result_count_ti.fill(0)
+        result_count_np = np.zeros(1, dtype=np.int32)
 
         self._radius_query_filter_kernel(
             candidate_indices_np.shape[0],
@@ -347,15 +328,13 @@ class SpatialGridIndex:
             float(query_x),
             float(query_y),
             float(radius**2),
-            result_buffer_ti,
-            result_count_ti,
+            result_buffer_np,
+            result_count_np,
         )
 
-        num_actual_hits = result_count_ti[None]
-        # Convert Taichi ndarray (result_buffer_ti) back to NumPy array to slice it
-        final_results_np = result_buffer_ti.to_numpy()
+        num_actual_hits = result_count_np[0]
 
-        return final_results_np[:num_actual_hits].copy()
+        return result_buffer_np[:num_actual_hits].copy()
 
 
 # --- MAIN EXAMPLE USAGE (Updated for Class) ---
@@ -443,7 +422,7 @@ if __name__ == "__main__":
         f"Grid dimensions: ({spatial_index.grid_dim_x}, {spatial_index.grid_dim_y}) cells"
     )
 
-    counts_sum = np.sum(spatial_index.cell_point_counts.to_numpy())
+    counts_sum = np.sum(spatial_index.cell_point_counts)
     print(f"Total indexed points (sum of cell_point_counts): {counts_sum}")
     if (
         spatial_index.indexed_point_indices.shape[0] > 0 or counts_sum > 0
