@@ -36,9 +36,9 @@ def min_max_grid_kernel(
         giy = ti.cast(ti.floor(gy_float), ti.i32)
 
         if 0 <= gix < grid_width and 0 <= giy < grid_height:
-            ti.atomic_add(count_field[gix, giy], 1)
-            ti.atomic_min(min_z_field[gix, giy], points_z[i])
-            ti.atomic_max(max_z_field[gix, giy], points_z[i])
+            ti.atomic_add(count_field[giy, gix], 1)
+            ti.atomic_min(min_z_field[giy, gix], points_z[i])
+            ti.atomic_max(max_z_field[giy, gix], points_z[i])
 
 
 def _base_min_max(
@@ -79,9 +79,9 @@ def _base_min_max(
     if grid_width <= 0 or grid_height <= 0:
         return np.array([[]], dtype=np.float32)
 
-    min_z_np = np.full((grid_width, grid_height), 1e30, dtype=np.float32)
-    max_z_np = np.full((grid_width, grid_height), -1e30, dtype=np.float32)
-    count_np = np.zeros((grid_width, grid_height), dtype=np.int32)
+    min_z_np = np.full((grid_height, grid_width), 1e30, dtype=np.float32)
+    max_z_np = np.full((grid_height, grid_width), -1e30, dtype=np.float32)
+    count_np = np.zeros((grid_height, grid_width), dtype=np.int32)
 
     min_max_grid_kernel(
         points_x_np,
@@ -104,7 +104,7 @@ def _base_min_max(
 
     dtm_np = np.full((grid_height, grid_width), nodata_value, dtype=np.float32)
     valid_cells_mask = count_np > 0
-    dtm_np[valid_cells_mask.T] = res_np.T[valid_cells_mask.T]
+    dtm_np[valid_cells_mask] = res_np[valid_cells_mask]
 
     return dtm_np
 

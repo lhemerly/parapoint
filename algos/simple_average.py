@@ -51,8 +51,8 @@ def assign_points_to_grid_kernel(
         if 0 <= gix < grid_width and 0 <= giy < grid_height:
             # Atomically add to the sum and count for the cell
             # This is crucial for parallel execution to avoid race conditions
-            ti.atomic_add(sum_z_field[gix, giy], points_z[i])
-            ti.atomic_add(count_field[gix, giy], 1)
+            ti.atomic_add(sum_z_field[giy, gix], points_z[i])
+            ti.atomic_add(count_field[giy, gix], 1)
 
 
 # --- Main Python Function ---
@@ -122,8 +122,8 @@ def simple(
 
     # Initialize NumPy arrays for sum of Z and counts
     # These arrays will store the accumulated values per grid cell
-    sum_z_np = np.zeros((grid_width, grid_height), dtype=np.float32)
-    count_np = np.zeros((grid_width, grid_height), dtype=np.int32)
+    sum_z_np = np.zeros((grid_height, grid_width), dtype=np.float32)
+    count_np = np.zeros((grid_height, grid_width), dtype=np.int32)
 
     # Call the Taichi kernel
     print("Launching Taichi kernel to assign points to grid...")
@@ -149,9 +149,9 @@ def simple(
 
     # Avoid division by zero: only calculate average where count_np > 0
     valid_cells_mask = count_np > 0
-    dtm_np[valid_cells_mask.T] = (
+    dtm_np[valid_cells_mask] = (
         sum_z_np[valid_cells_mask] / count_np[valid_cells_mask]
-    )  # Transpose mask to match dtm_np shape
+    )
 
     print("DTM creation complete.")
     return dtm_np  # Return as (height, width) which is common for rasters
