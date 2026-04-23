@@ -1,5 +1,9 @@
 import numpy as np
-from algos.terrain_derivatives import calculate_terrain_derivatives
+from algos.terrain_derivatives import (
+    calculate_terrain_derivatives,
+    calculate_tpi,
+    calculate_tri,
+)
 
 
 def test_calculate_terrain_derivatives():
@@ -39,3 +43,51 @@ def test_terrain_derivatives_empty():
     assert res["slope"].size == 0
     assert res["aspect"].size == 0
     assert res["hillshade"].size == 0
+
+
+def test_tpi_basic():
+    # 3x3 plane, center should have TPI 0
+    dtm = np.array(
+        [[10.0, 10.0, 10.0], [10.0, 10.0, 10.0], [10.0, 10.0, 10.0]], dtype=np.float32
+    )
+
+    tpi = calculate_tpi(dtm, radius=1, nodata_value=-9999.0)
+    # Center cell mean of 8 neighbors is 10. 10 - 10 = 0.
+    assert np.isclose(tpi[1, 1], 0.0)
+
+    # Peak
+    dtm_peak = np.array(
+        [[10.0, 10.0, 10.0], [10.0, 20.0, 10.0], [10.0, 10.0, 10.0]], dtype=np.float32
+    )
+
+    tpi_peak = calculate_tpi(dtm_peak, radius=1, nodata_value=-9999.0)
+    # Mean of neighbors is 10. Center is 20. TPI = 10.
+    assert np.isclose(tpi_peak[1, 1], 10.0)
+
+
+def test_tpi_empty():
+    res = calculate_tpi(np.array([[]], dtype=np.float32))
+    assert res.size == 0
+
+
+def test_tri_basic():
+    # 3x3 plane, TRI should be 0
+    dtm = np.array(
+        [[10.0, 10.0, 10.0], [10.0, 10.0, 10.0], [10.0, 10.0, 10.0]], dtype=np.float32
+    )
+
+    tri = calculate_tri(dtm, nodata_value=-9999.0)
+    assert np.isclose(tri[1, 1], 0.0)
+
+    # Center diff = 1 with all neighbors -> sum of diffs = 8
+    dtm_bump = np.array(
+        [[10.0, 10.0, 10.0], [10.0, 11.0, 10.0], [10.0, 10.0, 10.0]], dtype=np.float32
+    )
+
+    tri_bump = calculate_tri(dtm_bump, nodata_value=-9999.0)
+    assert np.isclose(tri_bump[1, 1], 8.0)
+
+
+def test_tri_empty():
+    res = calculate_tri(np.array([[]], dtype=np.float32))
+    assert res.size == 0

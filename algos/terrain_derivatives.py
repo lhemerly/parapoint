@@ -158,3 +158,124 @@ def calculate_terrain_derivatives(
         )
 
     return {"slope": out_slope, "aspect": out_aspect, "hillshade": out_hillshade}
+
+
+@ti.kernel
+def tpi_kernel(
+    dtm: ti.types.ndarray(ti.f32, ndim=2),
+    out_tpi: ti.types.ndarray(ti.f32, ndim=2),
+    nodata_value: ti.f32,
+    rows: ti.i32,
+    cols: ti.i32,
+    radius: ti.i32,
+):
+    for r, c in ti.ndrange(rows, cols):
+        if dtm[r, c] == nodata_value:
+            out_tpi[r, c] = nodata_value
+        else:
+            sum_z = 0.0
+            count = 0
+            for i in range(-radius, radius + 1):
+                for j in range(-radius, radius + 1):
+                    nr = r + i
+                    nc = c + j
+                    if 0 <= nr < rows and 0 <= nc < cols:
+                        if i != 0 or j != 0:
+                            neighbor_val = dtm[nr, nc]
+                            if neighbor_val != nodata_value:
+                                sum_z += neighbor_val
+                                count += 1
+
+            if count > 0:
+                mean_z = sum_z / ti.cast(count, ti.f32)
+                out_tpi[r, c] = dtm[r, c] - mean_z
+            else:
+                # No valid neighbors, TPI is 0
+                out_tpi[r, c] = 0.0
+
+
+@ti.kernel
+def tri_kernel(
+    dtm: ti.types.ndarray(ti.f32, ndim=2),
+    out_tri: ti.types.ndarray(ti.f32, ndim=2),
+    nodata_value: ti.f32,
+    rows: ti.i32,
+    cols: ti.i32,
+):
+    for r, c in ti.ndrange(rows, cols):
+        if dtm[r, c] == nodata_value:
+            out_tri[r, c] = nodata_value
+        else:
+            sum_diff_sq = 0.0
+            count = 0
+            center_val = dtm[r, c]
+            for i in range(-1, 2):
+                for j in range(-1, 2):
+                    nr = r + i
+                    nc = c + j
+                    if 0 <= nr < rows and 0 <= nc < cols:
+                        if i != 0 or j != 0:
+                            neighbor_val = dtm[nr, nc]
+                            if neighbor_val != nodata_value:
+                                sum_diff_sq += ti.abs(center_val - neighbor_val)
+                                count += 1
+
+            if count > 0:
+                out_tri[r, c] = sum_diff_sq
+            else:
+                out_tri[r, c] = 0.0
+
+
+def calculate_tpi(
+    dtm: np.ndarray,
+    radius: int = 1,
+    nodata_value: float = -9999.0,
+) -> np.ndarray:
+    """
+    Calculates the Topographic Position Index (TPI) for a DTM.
+    TPI compares the elevation of each cell to the mean elevation of a specified neighborhood.
+
+    Args:
+        dtm (np.ndarray): The input Digital Terrain Model.
+        radius (int): The radius of the neighborhood (e.g., 1 means a 3x3 window).
+        nodata_value (float): The nodata value to ignore.
+
+    Returns:
+        np.ndarray: The TPI array.
+    """
+    if dtm.size == 0 or dtm.ndim != 2:
+        return np.array([[]], dtype=np.float32)
+
+    rows, cols = dtm.shape
+    dtm_f32 = dtm.astype(np.float32)
+    out_tpi = np.empty_like(dtm_f32)
+
+    tpi_kernel(dtm_f32, out_tpi, nodata_value, rows, cols, radius)
+
+    return out_tpi
+
+
+def calculate_tri(
+    dtm: np.ndarray,
+    nodata_value: float = -9999.0,
+) -> np.ndarray:
+    """
+    Calculates the Topographic Ruggedness Index (TRI) for a DTM using Riley et al. (1999) approach (sum of abs differences).
+
+    Args:
+        dtm (np.ndarray): The input Digital Terrain Model.
+        nodata_value (float): The nodata value to ignore.
+
+    Returns:
+        np.ndarray: The TRI array.
+    """
+    if dtm.size == 0 or dtm.ndim != 2:
+        return np.array([[]], dtype=np.float32)
+
+    rows, cols = dtm.shape
+    dtm_f32 = dtm.astype(np.float32)
+    out_tri = np.empty_like(dtm_f32)
+
+    tri_kernel(dtm_f32, out_tri, nodata_value, rows, cols)
+
+    return out_tri
