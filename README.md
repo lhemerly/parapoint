@@ -11,7 +11,7 @@ The library provides methods for creating Digital Terrain Models (DTMs) from uno
     - **Inverse Distance Weighting (IDW):** A common method for interpolating scattered data points.
     - **Simple Averaging:** A basic gridding approach that averages Z values of points falling within each grid cell.
     - **Min/Max Z:** DTM creation using the minimum or maximum Z values within each grid cell.
-    - **Terrain Derivatives:** Calculates slope, aspect, and hillshade from a generated DTM.
+    - **Advanced Terrain Metrics:** Calculate Slope, Aspect, Hillshade, Topographic Position Index (TPI), and Topographic Ruggedness Index (TRI).
 - **NumPy Integration:** Accepts and returns NumPy arrays, making it easy to integrate into existing Python workflows.
 - **Customizable:** Allows control over DTM resolution, extent, search radius (for IDW), and nodata values.
 
@@ -77,6 +77,20 @@ if dtm_idw.size > 0:
 else:
     print("IDW DTM is empty.")
 
+# --- Applying Post-Processing ---
+print("\n--- Smoothing and Filling Nodata ---")
+# Fill small gaps
+dtm_filled = parapoint.fill_nodata(dtm_idw, max_iterations=3, radius=1, nodata_value=-9999.0)
+# Smooth noise
+dtm_smoothed = parapoint.gaussian_filter(dtm_filled, sigma=1.0, radius=2, nodata_value=-9999.0)
+
+# --- Calculating Terrain Derivatives ---
+print("\n--- Calculating TPI and TRI ---")
+tpi = parapoint.calculate_tpi(dtm_smoothed, radius=2, nodata_value=-9999.0)
+tri = parapoint.calculate_tri(dtm_smoothed, nodata_value=-9999.0)
+
+# Further processing or visualization of dtm_avg, dtm_idw, or derivatives can be done here.
+# For example, using matplotlib or a GIS library like rasterio to save as GeoTIFF.
 
 # --- Min and Max Z DTMs ---
 print("\n--- Running Min and Max Z DTM --- ")
