@@ -332,18 +332,29 @@ class SpatialGridIndex:
             return np.array([], dtype=np.int32)
 
         total_candidates = sum(c.size for c in candidate_indices_list)
+        # Allocate persistent buffer for candidates if it doesn't exist
+        if not hasattr(self, '_candidate_buffer') or self._candidate_buffer.shape[0] < total_candidates:
+            self._candidate_buffer = ti.ndarray(ti.i32, shape=total_candidates)
+
         candidate_indices_np = np.concatenate(candidate_indices_list)
         if candidate_indices_np.size == 0:  # Should be caught by previous check
             return np.array([], dtype=np.int32)
 
-        # Allocate candidate buffer exactly sized to avoid uploading stale padding entries
-        if not hasattr(self, '_candidate_buffer') or self._candidate_buffer.shape[0] != total_candidates:
-            self._candidate_buffer = ti.ndarray(ti.i32, shape=total_candidates)
+        # Convert NumPy arrays to Taichi ndarrays for the kernel
         candidate_indices_ti = self._candidate_buffer
-        candidate_indices_ti.from_numpy(candidate_indices_np)
+        if not hasattr(self, '_tmp_buffer') or self._tmp_buffer.shape[0] < self._candidate_buffer.shape[0]:
+            self._tmp_buffer = np.zeros(self._candidate_buffer.shape[0], dtype=np.int32)
 
-        # Output buffer for results from kernel, exactly sized to avoid inflating to_numpy() costs
-        if not hasattr(self, '_result_buffer') or self._result_buffer.shape[0] != total_candidates:
+        if candidate_indices_np.shape[0] < self._candidate_buffer.shape[0]:
+            self._tmp_buffer[:candidate_indices_np.shape[0]] = candidate_indices_np
+            candidate_indices_ti.from_numpy(self._tmp_buffer)
+        else:
+            candidate_indices_ti.from_numpy(candidate_indices_np)
+
+        # These are the full original coordinate arrays (already stored as taichi ndarrays in init)
+
+        # Output buffer for results from kernel, same size as candidates
+        if not hasattr(self, '_result_buffer') or self._result_buffer.shape[0] < total_candidates:
             self._result_buffer = ti.ndarray(ti.i32, shape=total_candidates)
         result_buffer_ti = self._result_buffer
 
