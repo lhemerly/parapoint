@@ -12,7 +12,7 @@ try:
 except Exception as e_gpu:
     print(f"GPU backend for Taichi failed: {e_gpu}")
     print("Falling back to CPU backend for Taichi.")
-    ti.init(arch=ti.cpu)
+    ti.init(arch=ti.gpu)
     print("Taichi initialized with CPU backend.")
 
 
