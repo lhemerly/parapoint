@@ -118,6 +118,9 @@ class SpatialGridIndex:
             self.cell_point_counts.fill(0)
             self.cell_offsets.fill(0)
             self.indexed_point_indices.fill(0)
+            self._indexed_point_indices_np = np.array([], dtype=np.int32)
+            self._points_x_coords_ti = ti.ndarray(ti.f32, shape=1)
+            self._points_y_coords_ti = ti.ndarray(ti.f32, shape=1)
             return
 
         # 1. Determine extent and grid dimensions
@@ -229,6 +232,13 @@ class SpatialGridIndex:
                 self.indexed_point_indices,
             )
 
+        # 7. Cache static representations to prevent per-query O(N) operations
+        self._indexed_point_indices_np = self.indexed_point_indices.to_numpy()
+        self._points_x_coords_ti = ti.ndarray(ti.f32, shape=self.points_x_np.shape[0])
+        self._points_y_coords_ti = ti.ndarray(ti.f32, shape=self.points_y_np.shape[0])
+        self._points_x_coords_ti.from_numpy(self.points_x_np)
+        self._points_y_coords_ti.from_numpy(self.points_y_np)
+
     def get_cell_indices(self, x: float, y: float) -> tuple[int, int]:
         cell_idx = int(ti.floor((x - self.min_x) / self.resolution))
         cell_idy = int(ti.floor((y - self.min_y) / self.resolution))
@@ -253,13 +263,9 @@ class SpatialGridIndex:
         if count == 0:
             return np.array([], dtype=np.int32)
 
-        # Slice the Taichi field to get results.
-        # Taichi field slicing `field[start:end]` creates a Taichi expression, not a NumPy array directly.
-        # To get a NumPy array, we need to use .to_numpy() on the whole field and then slice,
-        # or use a helper kernel to copy to a new (smaller) Taichi field/ndarray then .to_numpy().
-        # For typical use cases where this slice isn't enormous, full .to_numpy() is simpler.
-        all_indices_np = self.indexed_point_indices.to_numpy()
-        return all_indices_np[start_offset : start_offset + count].copy()
+        # Slice the cached NumPy array to get results.
+        # This avoids calling .to_numpy() on the full Taichi field for every query.
+        return self._indexed_point_indices_np[start_offset : start_offset + count].copy()
 
     @ti.kernel
     def _radius_query_filter_kernel(
@@ -323,15 +329,9 @@ class SpatialGridIndex:
         if candidate_indices_np.size == 0:  # Should be caught by previous check
             return np.array([], dtype=np.int32)
 
-        # Convert NumPy arrays to Taichi ndarrays for the kernel
+        # Convert candidate NumPy arrays to Taichi ndarrays for the kernel
         candidate_indices_ti = ti.ndarray(ti.i32, shape=candidate_indices_np.shape[0])
         candidate_indices_ti.from_numpy(candidate_indices_np)
-
-        # These are the full original coordinate arrays
-        points_x_coords_ti = ti.ndarray(ti.f32, shape=self.points_x_np.shape[0])
-        points_y_coords_ti = ti.ndarray(ti.f32, shape=self.points_y_np.shape[0])
-        points_x_coords_ti.from_numpy(self.points_x_np)
-        points_y_coords_ti.from_numpy(self.points_y_np)
 
         # Output buffer for results from kernel, same size as candidates
         result_buffer_ti = ti.ndarray(ti.i32, shape=candidate_indices_np.shape[0])
@@ -342,8 +342,8 @@ class SpatialGridIndex:
         self._radius_query_filter_kernel(
             candidate_indices_np.shape[0],
             candidate_indices_ti,
-            points_x_coords_ti,
-            points_y_coords_ti,
+            self._points_x_coords_ti,
+            self._points_y_coords_ti,
             float(query_x),
             float(query_y),
             float(radius**2),
