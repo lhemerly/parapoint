@@ -20,7 +20,7 @@ def idw_interpolation_kernel(
     points_x: ti.types.ndarray(ti.f32, ndim=1),
     points_y: ti.types.ndarray(ti.f32, ndim=1),
     points_z: ti.types.ndarray(ti.f32, ndim=1),
-    dtm_field: ti.template(),
+    dtm_field: ti.types.ndarray(ti.f32, ndim=2),
     min_x_dtm: ti.f32,
     min_y_dtm: ti.f32,
     resolution_dtm: ti.f32,
@@ -223,8 +223,7 @@ def idw(
         dtm_output = np.full((grid_height, grid_width), nodata_value, dtype=np.float32)
         return dtm_output
 
-    dtm_output_field = ti.field(dtype=ti.f32, shape=(grid_height, grid_width))
-    dtm_output_field.fill(nodata_value)
+    dtm_output_np = np.full((grid_height, grid_width), nodata_value, dtype=np.float32)
 
     print("Launching Taichi IDW kernel (with Spatial Index)...")
     kernel_start_time = time.time()
@@ -232,7 +231,7 @@ def idw(
         points_x_np,
         points_y_np,
         points_z_np,  # Original point data (NumPy)
-        dtm_output_field,
+        dtm_output_np,
         min_x_dtm_grid,
         min_y_dtm_grid,
         dtm_resolution,  # DTM grid origin and resolution
@@ -251,14 +250,11 @@ def idw(
         spatial_index.grid_dim_x,  # Index grid dimension x
         spatial_index.grid_dim_y,  # Index grid dimension y
     )
-    ti.sync()
     kernel_end_time = time.time()
     print(
         f"Taichi kernel execution finished in {kernel_end_time - kernel_start_time:.2f} seconds."
     )
 
-    dtm_np = dtm_output_field.to_numpy()
-
     total_time = time.time() - start_time
     print(f"IDW DTM creation complete in {total_time:.2f} seconds.")
-    return dtm_np
+    return dtm_output_np
