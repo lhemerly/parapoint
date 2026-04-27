@@ -18,9 +18,9 @@ def min_max_grid_kernel(
     points_x: ti.types.ndarray(ti.f32, ndim=1),
     points_y: ti.types.ndarray(ti.f32, ndim=1),
     points_z: ti.types.ndarray(ti.f32, ndim=1),
-    min_z_field: ti.template(),
-    max_z_field: ti.template(),
-    count_field: ti.template(),
+    min_z_field: ti.types.ndarray(ti.f32, ndim=2),
+    max_z_field: ti.types.ndarray(ti.f32, ndim=2),
+    count_field: ti.types.ndarray(ti.i32, ndim=2),
     min_x_dtm: ti.f32,
     min_y_dtm: ti.f32,
     resolution_dtm: ti.f32,
@@ -79,22 +79,17 @@ def _base_min_max(
     if grid_width <= 0 or grid_height <= 0:
         return np.array([[]], dtype=np.float32)
 
-    min_z_field = ti.field(dtype=ti.f32, shape=(grid_width, grid_height))
-    max_z_field = ti.field(dtype=ti.f32, shape=(grid_width, grid_height))
-    count_field = ti.field(dtype=ti.i32, shape=(grid_width, grid_height))
-
-    # Initialize with extreme values so atomic min/max works correctly
-    min_z_field.fill(1e30)
-    max_z_field.fill(-1e30)
-    count_field.fill(0)
+    min_z_np = np.full((grid_width, grid_height), 1e30, dtype=np.float32)
+    max_z_np = np.full((grid_width, grid_height), -1e30, dtype=np.float32)
+    count_np = np.zeros((grid_width, grid_height), dtype=np.int32)
 
     min_max_grid_kernel(
         points_x_np,
         points_y_np,
         points_z_np,
-        min_z_field,
-        max_z_field,
-        count_field,
+        min_z_np,
+        max_z_np,
+        count_np,
         min_x,
         min_y,
         dtm_resolution,
@@ -102,12 +97,10 @@ def _base_min_max(
         grid_height,
     )
 
-    count_np = count_field.to_numpy()
-
     if return_min:
-        res_np = min_z_field.to_numpy()
+        res_np = min_z_np
     else:
-        res_np = max_z_field.to_numpy()
+        res_np = max_z_np
 
     dtm_np = np.full((grid_height, grid_width), nodata_value, dtype=np.float32)
     valid_cells_mask = count_np > 0
